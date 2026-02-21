@@ -1,0 +1,54 @@
+function enviarCorreosAcciones() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("acciones");
+  var data = sheet.getDataRange().getValues();
+
+  // encabezados
+  var headers = data[0];
+  var idxEmail = headers.indexOf("email");
+  var idxNombre = headers.indexOf("Nombre");
+  var idxAccion = headers.indexOf("Accion");
+  var idxStatus = headers.indexOf("estatus_envio");
+  var idxTime = headers.indexOf("timestamp_envio");
+
+  if ([idxEmail, idxNombre, idxAccion, idxStatus, idxTime].some(i => i === -1)) {
+    throw new Error("Faltan columnas requeridas en la hoja 'acciones'.");
+  }
+
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    var status = row[idxStatus];
+
+    if (status !== "PENDIENTE") continue;
+
+    var email = row[idxEmail];
+    var nombre = row[idxNombre];
+    var accion = row[idxAccion];
+
+    // Plantillas por acción
+    var subject = "";
+    var body = "";
+
+    if (accion === "Aumentar") {
+      subject = "Actualización: revisión de límite";
+      body = "Hola " + nombre + ",\n\nDetectamos un comportamiento de gasto que supera el rango esperado. " +
+             "Se sugiere una revisión para posible incremento de límite.\n\nMotivo: Realizo suficientes compras en el periodo\n\nSaludos.";
+    } else if (accion === "Disminuir") {
+      subject = "Aviso: revisión de límite";
+      body = "Hola " + nombre + ",\n\nDetectamos un comportamiento de gasto por debajo del rango esperado. " +
+             "Se sugiere una revisión para posible ajuste del límite.\n\nMotivo: No realizo suficientes compras en el periodo \n\nSaludos.";
+    } else {
+      // SIN_ACCION -> no enviamos
+      sheet.getRange(r+1, idxStatus+1).setValue("OMITIDO");
+      sheet.getRange(r+1, idxTime+1).setValue(new Date());
+      continue;
+    }
+
+    // Enviar correo
+    GmailApp.sendEmail(email, subject, body);
+
+    // Marcar enviado
+    sheet.getRange(r+1, idxStatus+1).setValue("ENVIADO");
+    sheet.getRange(r+1, idxTime+1).setValue(new Date());
+  }
+}
